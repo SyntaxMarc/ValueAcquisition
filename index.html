@@ -1,248 +1,163 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MLB Dashboard</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background-color: #121212;
-      color: #eee;
-    }
-    header {
-      background: #1f1f1f;
-      padding: 1rem;
-      text-align: center;
-      font-size: 1.5rem;
-      font-weight: bold;
-    }
-    .container {
-      padding: 1rem;
-    }
-    .controls {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-    }
-    button {
-      padding: 0.5rem 1rem;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      background: #2e2e2e;
-      color: #fff;
-    }
-    button:hover {
-      background: #444;
-    }
-    .table-wrapper {
-      overflow-x: auto;
-      margin-bottom: 2rem;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 1rem;
-      min-width: 600px;
-    }
-    th, td {
-      padding: 0.6rem;
-      border: 1px solid #333;
-      text-align: center;
-    }
-    th {
-      background: #222;
-    }
-    tr:nth-child(even) {
-      background: #1a1a1a;
-    }
-    .ev-positive {
-      color: #4caf50;
-      font-weight: bold;
-    }
-    .ev-negative {
-      color: #f44336;
-      font-weight: bold;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MLB Dashboard</title>
+<style>
+  body { margin:0; font-family:Arial,sans-serif; background:#121212; color:#eee; }
+  header { background:#1f1f1f; padding:1rem; text-align:center; font-size:1.5rem; font-weight:bold; }
+  .container { padding:1rem; }
+  .controls { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:1rem; }
+  button { padding:.5rem 1rem; border:none; border-radius:6px; cursor:pointer; background:#2e2e2e; color:#fff; }
+  button:hover { background:#444; }
+  .table-wrapper { overflow-x:auto; margin-bottom:2rem; }
+  table { width:100%; border-collapse:collapse; min-width:700px; }
+  th, td { padding:.6rem; border:1px solid #333; text-align:center; }
+  th { background:#222; }
+  tr:nth-child(even) { background:#1a1a1a; }
+  .ev-positive { color:#4caf50; font-weight:bold; }
+  .ev-medium { color:#ffeb3b; font-weight:bold; }
+  .ev-negative { color:#f44336; font-weight:bold; }
+</style>
 </head>
 <body>
-  <header>⚾ MLB Value Betting Dashboard</header>
-  <div class="container">
-    <div class="controls">
-      <button onclick="loadGames()">🔄 Refresh Games</button>
-      <button onclick="manualReset()">🕗 Manual Reset</button>
-    </div>
-
-    <!-- Single Game Table -->
-    <div class="table-wrapper">
-      <table id="gamesTable">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Team</th>
-            <th>Odds (API)</th>
-            <th>Probability %</th>
-            <th>EV%</th>
-            <th>Note</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-
-    <!-- Strong Parlay Table -->
-    <h3>🔥 Strong Parlay for Today</h3>
-    <div class="table-wrapper">
-      <table id="parlayTable">
-        <thead>
-          <tr>
-            <th>Legs (Teams)</th>
-            <th>Combined EV %</th>
-            <th>Note</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
+<header>⚾ MLB Value Betting Dashboard</header>
+<div class="container">
+  <div class="controls">
+    <button onclick="loadGames()">🔄 Refresh Games</button>
+    <button onclick="manualReset()">🕗 Manual Reset</button>
   </div>
 
-  <script>
-    const ODDS_API_KEY = "6d667177117b78ce8b2c728ee4721cb9"; // your Odds API
-    const ODDS_API_URL = `https://api.the-odds-api.com/v4/sports/baseball_mlb/odds/?regions=us&oddsFormat=decimal&apiKey=${ODDS_API_KEY}`;
+  <!-- Single Game Table -->
+  <div class="table-wrapper">
+    <table id="gamesTable">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Home Team</th>
+          <th>Away Team</th>
+          <th>Home Odds</th>
+          <th>Away Odds</th>
+          <th>Home EV</th>
+          <th>Away EV</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
 
-    function getIPCmockOdds(team) {
-      return (Math.random() * (2.5 - 1.2) + 1.2).toFixed(2);
-    }
+  <!-- Strong Parlay Table -->
+  <h3>🔥 Strong Parlays for Today</h3>
+  <div class="table-wrapper">
+    <table id="parlayTable">
+      <thead>
+        <tr>
+          <th>Legs (Teams)</th>
+          <th>Combined EV %</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
 
-    function calcEV(prob, odds) {
-      return (prob * odds - 1) * 100;
-    }
+<script>
+const ODDS_API_KEY = "6d667177117b78ce8b2c728ee4721cb9";
+const ODDS_API_URL = `https://api.the-odds-api.com/v4/sports/baseball_mlb/odds/?regions=us&oddsFormat=decimal&apiKey=${ODDS_API_KEY}`;
 
-    async function loadGames() {
-      const tbody = document.querySelector("#gamesTable tbody");
-      tbody.innerHTML = "<tr><td colspan='6'>Loading...</td></tr>";
-      try {
-        const res = await fetch(ODDS_API_URL);
-        if (!res.ok) throw new Error("API Error");
-        const data = await res.json();
-        tbody.innerHTML = "";
+function getIPCmockOdds(team) { return (Math.random()*(2.5-1.2)+1.2).toFixed(2); }
+function calcEV(prob, odds) { return (prob*odds-1)*100; }
 
-        data.forEach(game => {
-          const home = game.home_team;
-          const away = game.away_team;
-          const bookmaker = game.bookmakers[0];
-          const market = bookmaker.markets.find(m => m.key === "h2h");
-          if (!market) return;
+async function loadGames() {
+  const tbody = document.querySelector("#gamesTable tbody");
+  tbody.innerHTML="<tr><td colspan='8'>Loading...</td></tr>";
+  try {
+    const res = await fetch(ODDS_API_URL);
+    if(!res.ok) throw new Error("API Error");
+    const data = await res.json();
+    tbody.innerHTML="";
 
-          const oddsAPIhome = market.outcomes.find(o => o.name === home)?.price;
-          const oddsAPIaway = market.outcomes.find(o => o.name === away)?.price;
+    data.forEach(game=>{
+      const home = game.home_team;
+      const away = game.away_team;
+      const bookmaker = game.bookmakers[0];
+      const market = bookmaker.markets.find(m=>m.key==="h2h");
+      if(!market) return;
 
-          const ipcHome = getIPCmockOdds(home);
-          const ipcAway = getIPCmockOdds(away);
+      const oddsAPIhome = market.outcomes.find(o=>o.name===home)?.price;
+      const oddsAPIaway = market.outcomes.find(o=>o.name===away)?.price;
 
-          const probHome = 1 / ipcHome;
-          const probAway = 1 / ipcAway;
+      const ipcHome = getIPCmockOdds(home);
+      const ipcAway = getIPCmockOdds(away);
 
-          const evHome = calcEV(probHome, oddsAPIhome);
-          const evAway = calcEV(probAway, oddsAPIaway);
+      const probHome = 1/ipcHome;
+      const probAway = 1/ipcAway;
 
-          const trHome = document.createElement("tr");
-          trHome.innerHTML = `
-            <td>${new Date(game.commence_time).toLocaleString()}</td>
-            <td>${home}</td>
-            <td>${oddsAPIhome}</td>
-            <td>${(probHome*100).toFixed(0)}%</td>
-            <td class="${evHome>=0?'ev-positive':'ev-negative'}">${evHome.toFixed(1)}%</td>
-            <td>${(evHome>0 && probHome>=0.7)?'💎 Value Bet':''}</td>
-          `;
-          tbody.appendChild(trHome);
+      const evHome = calcEV(probHome, oddsAPIhome);
+      const evAway = calcEV(probAway, oddsAPIaway);
 
-          const trAway = document.createElement("tr");
-          trAway.innerHTML = `
-            <td>${new Date(game.commence_time).toLocaleString()}</td>
-            <td>${away}</td>
-            <td>${oddsAPIaway}</td>
-            <td>${(probAway*100).toFixed(0)}%</td>
-            <td class="${evAway>=0?'ev-positive':'ev-negative'}">${evAway.toFixed(1)}%</td>
-            <td>${(evAway>0 && probAway>=0.7)?'💎 Value Bet':''}</td>
-          `;
-          tbody.appendChild(trAway);
-        });
-
-        // Add NY Yankees 75% example bet
-        addExampleBet();
-
-        // Generate Strong Parlay automatically
-        generateStrongParlay();
-
-      } catch (err) {
-        tbody.innerHTML = `<tr><td colspan='6'>Error loading data</td></tr>`;
-      }
-    }
-
-    function manualReset() {
-      alert("Manual reset triggered (Next upgrade: auto reset at 8PM PH).");
-      loadGames();
-    }
-
-    function addExampleBet() {
-      const exampleBet = {
-        team: "NY Yankees",
-        probability: 0.75,
-        odds: 2.10
-      };
-      exampleBet.ev = (exampleBet.probability * exampleBet.odds - 1) * 100;
-      exampleBet.note = (exampleBet.ev>0 && exampleBet.probability>=0.7)? "💎 Value Bet" : "";
-
-      const tbody = document.querySelector("#gamesTable tbody");
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>Today</td>
-        <td>${exampleBet.team}</td>
-        <td>${exampleBet.odds.toFixed(2)}</td>
-        <td>${(exampleBet.probability*100).toFixed(0)}%</td>
-        <td class="${exampleBet.ev>=0?'ev-positive':'ev-negative'}">${exampleBet.ev.toFixed(1)}%</td>
-        <td>${exampleBet.note}</td>
-      `;
-      tbody.appendChild(tr);
-    }
-
-    function generateStrongParlay() {
-      const tbody = document.querySelector("#parlayTable tbody");
-      tbody.innerHTML = "";
-
-      const rows = Array.from(document.querySelectorAll("#gamesTable tbody tr"));
-      const strongLegs = rows
-        .map(row => {
-          return {
-            team: row.cells[1].innerText,
-            odds: parseFloat(row.cells[2].innerText),
-            prob: parseFloat(row.cells[3].innerText)/100,
-            ev: parseFloat(row.cells[4].innerText)
-          };
-        })
-        .filter(r => r.ev > 0 && r.prob >= 0.7)
-        .sort((a,b) => b.ev - a.ev);
-
-      if(strongLegs.length < 2) return;
-
-      const legs = strongLegs.slice(0,3); // Top 3 legs for strong parlay
-      const combinedEV = legs.reduce((acc, leg) => acc * leg.prob * leg.odds, 1) - 1;
+      const noteHome = (evHome>0 && probHome>=0.7)?'💎 Value Bet':'';
+      const noteAway = (evAway>0 && probAway>=0.7)?'💎 Value Bet':'';
 
       const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${legs.map(l => l.team).join(" | ")}</td>
-        <td>${(combinedEV*100).toFixed(1)}%</td>
-        <td>💎 Strong Value Parlay</td>
+      tr.innerHTML=`
+        <td>${new Date(game.commence_time).toLocaleString()}</td>
+        <td>${home}</td>
+        <td>${away}</td>
+        <td>${oddsAPIhome}</td>
+        <td>${oddsAPIaway}</td>
+        <td class="${evHome>=0?'ev-positive':'ev-negative'}">${evHome.toFixed(1)}%</td>
+        <td class="${evAway>=0?'ev-positive':'ev-negative'}">${evAway.toFixed(1)}%</td>
+        <td>${noteHome || noteAway}</td>
       `;
       tbody.appendChild(tr);
-    }
+    });
 
-    loadGames();
-  </script>
+    generateStrongParlays();
+
+  } catch(err) {
+    tbody.innerHTML="<tr><td colspan='8'>Error loading data</td></tr>";
+  }
+}
+
+function manualReset() { alert("Manual reset triggered (Next upgrade: auto reset at 8PM PH)."); loadGames(); }
+
+function generateStrongParlays() {
+  const tbody = document.querySelector("#parlayTable tbody");
+  tbody.innerHTML="";
+  const rows = Array.from(document.querySelectorAll("#gamesTable tbody tr"));
+  const strongLegs = [];
+  rows.forEach(row=>{
+    const homeEV=parseFloat(row.cells[5].innerText);
+    const awayEV=parseFloat(row.cells[6].innerText);
+    const homeProb = parseFloat(row.cells[3].innerText)/100;
+    const awayProb = parseFloat(row.cells[4].innerText)/100;
+    if(homeEV>0 && homeProb>=0.7) strongLegs.push({team:row.cells[1].innerText, odds:parseFloat(row.cells[3].innerText), prob:homeProb, ev:homeEV});
+    if(awayEV>0 && awayProb>=0.7) strongLegs.push({team:row.cells[2].innerText, odds:parseFloat(row.cells[4].innerText), prob:awayProb, ev:awayEV});
+  });
+
+  if(strongLegs.length<2) return;
+
+  // Generate 3,5,7-leg parlays
+  [3,5,7].forEach(n=>{
+    if(strongLegs.length<n) return;
+    const legs = strongLegs.slice(0,n);
+    const combinedEV = legs.reduce((acc,l)=>acc*l.prob*l.odds,1)-1;
+    const tr = document.createElement("tr");
+    let evClass = combinedEV>=0.5?'ev-positive':(combinedEV>=0?'ev-medium':'ev-negative');
+    tr.innerHTML=`
+      <td>${legs.map(l=>l.team).join(" | ")}</td>
+      <td class="${evClass}">${(combinedEV*100).toFixed(1)}%</td>
+      <td>💎 Strong Value Parlay (${n}-leg)</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+loadGames();
+</script>
 </body>
 </html>
