@@ -38,10 +38,15 @@
     button:hover {
       background: #444;
     }
+    .table-wrapper {
+      overflow-x: auto;
+      margin-bottom: 2rem;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 1rem;
+      min-width: 600px;
     }
     th, td {
       padding: 0.6rem;
@@ -71,25 +76,44 @@
       <button onclick="loadGames()">🔄 Refresh Games</button>
       <button onclick="manualReset()">🕗 Manual Reset</button>
     </div>
-    <table id="gamesTable">
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Teams</th>
-          <th>Odds (API)</th>
-          <th>Odds (IPC)</th>
-          <th>EV%</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+
+    <!-- Single Game Table -->
+    <div class="table-wrapper">
+      <table id="gamesTable">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Team</th>
+            <th>Odds (API)</th>
+            <th>Probability %</th>
+            <th>EV%</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- Strong Parlay Table -->
+    <h3>🔥 Strong Parlay for Today</h3>
+    <div class="table-wrapper">
+      <table id="parlayTable">
+        <thead>
+          <tr>
+            <th>Legs (Teams)</th>
+            <th>Combined EV %</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 
   <script>
     const ODDS_API_KEY = "6d667177117b78ce8b2c728ee4721cb9"; // your Odds API
     const ODDS_API_URL = `https://api.the-odds-api.com/v4/sports/baseball_mlb/odds/?regions=us&oddsFormat=decimal&apiKey=${ODDS_API_KEY}`;
 
-    // Fake IPC odds for now (mock until integration)
     function getIPCmockOdds(team) {
       return (Math.random() * (2.5 - 1.2) + 1.2).toFixed(2);
     }
@@ -100,12 +124,13 @@
 
     async function loadGames() {
       const tbody = document.querySelector("#gamesTable tbody");
-      tbody.innerHTML = "<tr><td colspan='5'>Loading...</td></tr>";
+      tbody.innerHTML = "<tr><td colspan='6'>Loading...</td></tr>";
       try {
         const res = await fetch(ODDS_API_URL);
         if (!res.ok) throw new Error("API Error");
         const data = await res.json();
         tbody.innerHTML = "";
+
         data.forEach(game => {
           const home = game.home_team;
           const away = game.away_team;
@@ -125,21 +150,37 @@
           const evHome = calcEV(probHome, oddsAPIhome);
           const evAway = calcEV(probAway, oddsAPIaway);
 
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
+          const trHome = document.createElement("tr");
+          trHome.innerHTML = `
             <td>${new Date(game.commence_time).toLocaleString()}</td>
-            <td>${away} @ ${home}</td>
-            <td>${oddsAPIaway} / ${oddsAPIhome}</td>
-            <td>${ipcAway} / ${ipcHome}</td>
-            <td>
-              <span class="${evHome >= 0 ? "ev-positive" : "ev-negative"}">Home EV: ${evHome.toFixed(1)}%</span><br>
-              <span class="${evAway >= 0 ? "ev-positive" : "ev-negative"}">Away EV: ${evAway.toFixed(1)}%</span>
-            </td>
+            <td>${home}</td>
+            <td>${oddsAPIhome}</td>
+            <td>${(probHome*100).toFixed(0)}%</td>
+            <td class="${evHome>=0?'ev-positive':'ev-negative'}">${evHome.toFixed(1)}%</td>
+            <td>${(evHome>0 && probHome>=0.7)?'💎 Value Bet':''}</td>
           `;
-          tbody.appendChild(tr);
+          tbody.appendChild(trHome);
+
+          const trAway = document.createElement("tr");
+          trAway.innerHTML = `
+            <td>${new Date(game.commence_time).toLocaleString()}</td>
+            <td>${away}</td>
+            <td>${oddsAPIaway}</td>
+            <td>${(probAway*100).toFixed(0)}%</td>
+            <td class="${evAway>=0?'ev-positive':'ev-negative'}">${evAway.toFixed(1)}%</td>
+            <td>${(evAway>0 && probAway>=0.7)?'💎 Value Bet':''}</td>
+          `;
+          tbody.appendChild(trAway);
         });
+
+        // Add NY Yankees 75% example bet
+        addExampleBet();
+
+        // Generate Strong Parlay automatically
+        generateStrongParlay();
+
       } catch (err) {
-        tbody.innerHTML = `<tr><td colspan='5'>Error loading data</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan='6'>Error loading data</td></tr>`;
       }
     }
 
@@ -148,7 +189,59 @@
       loadGames();
     }
 
-    // auto load
+    function addExampleBet() {
+      const exampleBet = {
+        team: "NY Yankees",
+        probability: 0.75,
+        odds: 2.10
+      };
+      exampleBet.ev = (exampleBet.probability * exampleBet.odds - 1) * 100;
+      exampleBet.note = (exampleBet.ev>0 && exampleBet.probability>=0.7)? "💎 Value Bet" : "";
+
+      const tbody = document.querySelector("#gamesTable tbody");
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>Today</td>
+        <td>${exampleBet.team}</td>
+        <td>${exampleBet.odds.toFixed(2)}</td>
+        <td>${(exampleBet.probability*100).toFixed(0)}%</td>
+        <td class="${exampleBet.ev>=0?'ev-positive':'ev-negative'}">${exampleBet.ev.toFixed(1)}%</td>
+        <td>${exampleBet.note}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    function generateStrongParlay() {
+      const tbody = document.querySelector("#parlayTable tbody");
+      tbody.innerHTML = "";
+
+      const rows = Array.from(document.querySelectorAll("#gamesTable tbody tr"));
+      const strongLegs = rows
+        .map(row => {
+          return {
+            team: row.cells[1].innerText,
+            odds: parseFloat(row.cells[2].innerText),
+            prob: parseFloat(row.cells[3].innerText)/100,
+            ev: parseFloat(row.cells[4].innerText)
+          };
+        })
+        .filter(r => r.ev > 0 && r.prob >= 0.7)
+        .sort((a,b) => b.ev - a.ev);
+
+      if(strongLegs.length < 2) return;
+
+      const legs = strongLegs.slice(0,3); // Top 3 legs for strong parlay
+      const combinedEV = legs.reduce((acc, leg) => acc * leg.prob * leg.odds, 1) - 1;
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${legs.map(l => l.team).join(" | ")}</td>
+        <td>${(combinedEV*100).toFixed(1)}%</td>
+        <td>💎 Strong Value Parlay</td>
+      `;
+      tbody.appendChild(tr);
+    }
+
     loadGames();
   </script>
 </body>
